@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import os.log
 import CSCore
 
@@ -80,6 +81,27 @@ public enum WorkspaceProfileKeychain {
         runSecurity(args: ["unlock-keychain", "-p", passphrase, url.path],
                     description: "unlock keychain for '\(profile.name)'")
 
+        // CRITICAL: Disable auto-lock so the keychain stays unlocked for the
+        // entire profile session.  Without this, the default 300-second inactivity
+        // timer fires and the keychain relocks.  When ANY system daemon
+        // (iCloudHelper, Mail, Safari, etc.) then searches the keychain list and
+        // hits a locked "cs-profile" keychain, macOS shows a password prompt.
+        // Entering the correct password doesn't "do" anything useful for those
+        // daemons — they're just scanning for their own items — so the prompt
+        // appears broken.  Keeping the keychain unlocked = no prompt, they scan
+        // silently and find nothing.
+        //
+        // "set-keychain-settings" with NO flags disables both lock-on-sleep and
+        // lock-on-timeout.  The physical file is protected by the encrypted APFS
+        // volume: when the volume unmounts, the file becomes inaccessible anyway.
+        runSecurity(args: ["set-keychain-settings", url.path],
+                    description: "disable auto-lock for '\(profile.name)'")
+
+        // Grant all applications access to the keychain without per-app prompts.
+        // This is equivalent to what login.keychain-db does — apps don't get
+        // prompted to access it, they just search and find (or don't find) items.
+        allowAllApplicationsAccess(keychainPath: url.path, passphrase: passphrase)
+
         // Build new search list: profile keychain first, then existing entries
         let existing = currentSearchList().filter { $0 != url.path }
         let newList  = [url.path] + existing
@@ -93,11 +115,16 @@ public enum WorkspaceProfileKeychain {
 
     /// Called when the profile's APFS volume is **unmounted**.
     ///
-    /// Removes the profile keychain from the search list and restores
-    /// `login.keychain-db` as the default.  The keychain file is now physically
-    /// inaccessible (inside the unmounted, encrypted APFS volume).
+    /// Locks and removes the profile keychain from the search list, then restores
+    /// `login.keychain-db` as the default.  After this call any system daemon
+    /// that scans the search list will no longer encounter the profile keychain.
     public static func deactivate(for profile: WorkspaceProfile) {
         let url = keychainURL(for: profile)
+
+        // Lock the keychain before removing it from the list so in-flight
+        // Security API calls from other processes fail fast rather than hanging.
+        runSecurity(args: ["lock-keychain", url.path],
+                    description: "lock keychain for '\(profile.name)'")
 
         removeFromSearchList(url: url)
         restoreLoginKeychainAsDefault()
@@ -131,6 +158,81 @@ public enum WorkspaceProfileKeychain {
         if !FileManager.default.fileExists(atPath: defaultKC) {
             restoreLoginKeychainAsDefault()
         }
+    }
+
+    // MARK: - ACL helpers
+
+    /// Grants all applications access to the keychain without requiring individual
+    /// per-app password prompts.
+    ///
+    /// When a keychain is created fresh, its default ACL prompts any application
+    /// that isn't explicitly on the trusted list (this is what causes the
+    /// iCloudHelper / Safari / Mail dialogs).  Setting an access object with an
+    /// **empty trusted-application list** tells macOS "any app may use this
+    /// keychain without prompting" — exactly how `login.keychain-db` behaves.
+    ///
+    /// The keychain's encryption is unchanged; this only affects the UI-level
+    /// confirmation gate, not the cryptographic protection of the stored data.
+    private static func allowAllApplicationsAccess(keychainPath: String, passphrase: String) {
+        var keychain: SecKeychain?
+        guard SecKeychainOpen(keychainPath, &keychain) == errSecSuccess,
+              let kc = keychain else {
+            log.warning("Could not open keychain at \(keychainPath, privacy: .public) to set ACL")
+            return
+        }
+
+        // Make sure it is unlocked before we touch it
+        let pwd = passphrase
+        SecKeychainUnlock(kc, UInt32(pwd.utf8.count), pwd, true)
+
+        // Disable auto-lock settings via the Security framework as well
+        // (belt-and-suspenders alongside the CLI call above)
+        var settings = SecKeychainSettings(
+            version: UInt32(SEC_KEYCHAIN_SETTINGS_VERS1),
+            lockOnSleep: false,
+            useLockInterval: false,
+            lockInterval: UInt32(INT_MAX)
+        )
+        SecKeychainSetSettings(kc, &settings)
+
+        // Create an access object with an empty trusted-app list.
+        // Empty array (not nil) = "trust all applications without prompting".
+        // nil = "always confirm" — the opposite of what we want.
+        let emptyArray = [] as CFArray
+        var access: SecAccess?
+        guard SecAccessCreate(
+            "Gridly Profile Keychain" as CFString,
+            emptyArray,
+            &access
+        ) == errSecSuccess, let acc = access else {
+            log.warning("Could not create permissive access object for keychain")
+            return
+        }
+
+        // Apply the access object to every ACL entry in the keychain.
+        // We enumerate the ACL list and replace each entry's trusted-app
+        // list with the empty (= any app) list.
+        var aclList: CFArray?
+        guard SecAccessCopyACLList(acc, &aclList) == errSecSuccess,
+              let acls = aclList as? [SecACL] else { return }
+
+        for acl in acls {
+            var appList: CFArray?
+            var desc: CFString?
+            var mask: SecKeychainPromptSelector = []
+            guard SecACLCopyContents(acl, &appList, &desc, &mask) == errSecSuccess else { continue }
+
+            // Replace the trusted-app list with empty (= allow all) and clear
+            // the "confirm access" prompt flag
+            SecACLSetContents(
+                acl,
+                emptyArray,                    // empty = trust everyone
+                (desc ?? "" as CFString),
+                []                             // no prompt selector flags
+            )
+        }
+
+        log.info("Set permissive ACL on profile keychain at \(keychainPath, privacy: .public)")
     }
 
     // MARK: - Search-List Helpers

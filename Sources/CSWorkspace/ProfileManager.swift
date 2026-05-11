@@ -42,6 +42,11 @@ public final class ProfileManager: ObservableObject {
     /// Optional audit logger — nil only in demo / unit-test mode.
     private let auditLogger: AuditLogger?
 
+    /// Optional session manager — when set, mounting a company profile automatically
+    /// creates a WorkspaceSession from the profile's companyConfig so the dashboard
+    /// session card shows real data instead of staying empty.
+    public weak var sessionManager: WorkspaceSessionManager?
+
     /// Per-profile volume managers, instantiated on first use.
     private var volumeManagers: [UUID: WorkspaceVolumeManager] = [:]
 
@@ -223,6 +228,29 @@ public final class ProfileManager: ObservableObject {
         log.info("Mounted profile '\(profile.name, privacy: .public)'")
         audit(.profileMounted, profile: profile)
 
+        // Populate the dashboard session card from the profile's company config.
+        // This replaces any stale/demo session with real identity data so the
+        // "User", "Tenant", "Token exp." fields reflect the actual signed-in account.
+        if let config = profile.companyConfig, config.isAuthenticated {
+            let accountID = profile.accountIdentifier.isEmpty ? nil : profile.accountIdentifier
+            let upn = config.userPrincipalName ?? accountID ?? config.tenantDomain
+            let expiresAt = config.lastBrokerAuthAt?.addingTimeInterval(3600)
+                ?? Date().addingTimeInterval(3600)
+            let realSession = WorkspaceSession(
+                userPrincipalName: upn ?? config.tenantDomain,
+                displayName: upn ?? config.tenantDisplayName,
+                tenantID: config.tenantID,
+                accessTokenExpiresAt: expiresAt,
+                isAuthenticated: true,
+                complianceStatus: .unknown
+            )
+            sessionManager?.session = realSession
+            log.info("Session populated from company config for '\(profile.name, privacy: .public)'")
+        } else if sessionManager?.session?.userPrincipalName.contains("contoso") == true {
+            // Clear any leftover demo session so the card shows "No active session"
+            sessionManager?.session = nil
+        }
+
         // Silently refresh the SSO broker session if this is a company profile.
         // Non-blocking: runs in background so mount doesn't wait on network.
         if let companyConfig = profile.companyConfig, companyConfig.isAuthenticated {
@@ -254,6 +282,12 @@ public final class ProfileManager: ObservableObject {
         mountStates[profile.id] = ProfileMountState(isMounted: false)
         log.info("Unmounted profile '\(profile.name, privacy: .public)'")
         audit(.profileUnmounted, profile: profile)
+
+        // Clear session if it belonged to this profile
+        if let upn = profile.companyConfig?.userPrincipalName ?? (profile.accountIdentifier.isEmpty ? nil : profile.accountIdentifier),
+           sessionManager?.session?.userPrincipalName == upn {
+            sessionManager?.session = nil
+        }
     }
 
     /// Unmounts all currently mounted profiles (e.g. on app quit or remote wipe).

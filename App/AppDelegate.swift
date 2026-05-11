@@ -48,6 +48,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         log.info("Gridly launched")
+        warnIfRunningFromWrongLocation()
+    }
+
+    /// Warns the user if Gridly is running from a DMG, Downloads, or any location
+    /// other than /Applications — data written outside /Applications does not
+    /// survive a clean drag-install update.
+    private func warnIfRunningFromWrongLocation() {
+        let bundlePath = Bundle.main.bundlePath
+        let allowedPrefixes = ["/Applications/", "/System/Applications/"]
+        let isCorrectLocation = allowedPrefixes.contains { bundlePath.hasPrefix($0) }
+        guard !isCorrectLocation else { return }
+
+        log.warning("App running from non-standard path: \(bundlePath, privacy: .public)")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            let alert = NSAlert()
+            alert.messageText = "Move Gridly to Applications"
+            alert.informativeText = """
+                Gridly is running from "\(bundlePath)".
+
+                For your profiles and settings to survive app updates, drag Gridly.app to your /Applications folder and launch it from there.
+
+                Your data is stored safely in ~/Library/Application Support/Gridly/ — it will not be affected by moving the app.
+                """
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Move to Applications")
+            alert.addButton(withTitle: "Continue Anyway")
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                // Open Applications folder and highlight the current .app
+                NSWorkspace.shared.activateFileViewerSelecting(
+                    [URL(fileURLWithPath: bundlePath)]
+                )
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -204,6 +239,10 @@ public final class AppContainer {
             crypto: crypto,
             idleTimeoutSeconds: UserDefaults.standard.integer(forKey: "lockTimeoutMinutes") * 60
         )
+
+        // Wire session manager into profile manager so unlocking a company profile
+        // automatically populates the dashboard session card with real identity data.
+        profileManager.sessionManager = sessionManager
         clipboardGuard = ClipboardGuard(
             policy: .strict,
             auditCallback: { [weak auditLogger] type, payload in

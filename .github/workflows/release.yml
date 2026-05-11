@@ -34,14 +34,20 @@ jobs:
 
       - name: Build (Release, ad-hoc signed)
         run: |
+          # Strip the leading "v" from the tag (v1.3.1 → 1.3.1)
+          APP_VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
           /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
             -project Gridly.xcodeproj \
             -scheme GridlyLocal \
             -configuration Release \
             CONFIGURATION_BUILD_DIR=/tmp/GridlyRelease \
             CODE_SIGN_IDENTITY="-" \
+            MARKETING_VERSION="${APP_VERSION}" \
+            CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
             build | tail -5
-          echo "✓ Build complete"
+          echo "✓ Build complete — version ${APP_VERSION} (${BUILD_NUMBER})"
           ls /tmp/GridlyRelease/
 
       - name: Package DMG

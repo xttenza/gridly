@@ -59,6 +59,7 @@ public enum CSError: LocalizedError, Sendable {
     // General
     case notSupported(String)
     case internalError(String)
+    case commandFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -101,6 +102,7 @@ public enum CSError: LocalizedError, Sendable {
         case .xpcOperationFailed(let r):       return "XPC operation failed: \(r)"
         case .notSupported(let r):             return "Not supported: \(r)"
         case .internalError(let r):            return "Internal error: \(r)"
+        case .commandFailed(let r):            return "Command failed: \(r)"
         }
     }
 }

@@ -64,6 +64,23 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
     /// Whether the user explicitly accepted the privacy disclosure screen.
     public var privacyDisclosureAccepted: Bool
 
+    // MARK: - Tier 2 (User Enrollment) fields
+
+    /// MDM server URL reported by the installed MDM profile (Intune, NanoMDM, etc.).
+    public var mdmServerURL: String?
+
+    /// Organisation name from the MDM payload (e.g. "Contoso IT").
+    public var mdmOrganisationName: String?
+
+    /// Whether this is an Apple User Enrollment (scoped) vs full-device enrollment.
+    public var isUserEnrollment: Bool
+
+    /// When the user completed Apple MDM enrollment (Tier 2).
+    public var userEnrolledAt: Date?
+
+    /// VPN server host configured for this profile after enrollment.
+    public var vpnEndpoint: String?
+
     // MARK: - Init
 
     public init(
@@ -77,7 +94,12 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
         enrolledAt: Date = Date(),
         lastBrokerAuthAt: Date? = nil,
         isDeviceRegistered: Bool = false,
-        privacyDisclosureAccepted: Bool = false
+        privacyDisclosureAccepted: Bool = false,
+        mdmServerURL: String? = nil,
+        mdmOrganisationName: String? = nil,
+        isUserEnrollment: Bool = false,
+        userEnrolledAt: Date? = nil,
+        vpnEndpoint: String? = nil
     ) {
         self.tenantID = tenantID
         self.tenantDomain = tenantDomain
@@ -90,6 +112,11 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
         self.lastBrokerAuthAt = lastBrokerAuthAt
         self.isDeviceRegistered = isDeviceRegistered
         self.privacyDisclosureAccepted = privacyDisclosureAccepted
+        self.mdmServerURL = mdmServerURL
+        self.mdmOrganisationName = mdmOrganisationName
+        self.isUserEnrollment = isUserEnrollment
+        self.userEnrolledAt = userEnrolledAt
+        self.vpnEndpoint = vpnEndpoint
     }
 
     // MARK: - Constants

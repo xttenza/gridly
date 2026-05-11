@@ -213,6 +213,7 @@ targets:
     dependencies:
       - target: CSCore
       - target: CSCrypto
+      - target: CSAuth
       - target: CSWorkspace
       - target: CSPolicy
       - target: CSAudit
@@ -350,7 +351,7 @@ schemes:
   GridlyMobile:
     build:
       targets:
-        GridlyPad: all
+        GridlyMobile: all
     run:
       config: Debug
     archive:

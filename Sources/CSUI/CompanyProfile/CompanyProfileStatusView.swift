@@ -20,6 +20,7 @@ public struct CompanyProfileStatusView: View {
     @ObservedObject public var profileManager: ProfileManager
 
     @State private var showWizard = false
+    @State private var showUpgradeWizard = false
     @State private var showDisconnectConfirm = false
 
     public init(profile: Binding<WorkspaceProfile>, profileManager: ProfileManager) {
@@ -47,6 +48,23 @@ public struct CompanyProfileStatusView: View {
                 onCancel: { showWizard = false }
             )
         }
+        .sheet(isPresented: $showUpgradeWizard) {
+            if var config = profile.companyConfig {
+                UserEnrollmentWizardView(
+                    config: Binding(
+                        get: { profile.companyConfig ?? config },
+                        set: { config = $0 }
+                    ),
+                    onComplete: { upgraded in
+                        var updated = profile
+                        updated.companyConfig = upgraded
+                        profileManager.updateProfile(updated)
+                        profile = updated
+                    },
+                    onCancel: { showUpgradeWizard = false }
+                )
+            }
+        }
         .confirmationDialog(
             "Disconnect Work Account?",
             isPresented: $showDisconnectConfirm,
@@ -63,38 +81,67 @@ public struct CompanyProfileStatusView: View {
     // MARK: - Connected state
 
     private func connectedView(config: CompanyProfileConfig) -> some View {
-        HStack(spacing: 8) {
-            // Tenant icon + name
-            HStack(spacing: 6) {
-                Image(systemName: ssoIcon(config: config))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ssoColor(config: config))
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(config.tenantDisplayName)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Text(statusLabel(config: config))
-                        .font(.system(size: 9))
+        VStack(alignment: .leading, spacing: 6) {
+            // Main status badge row
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: ssoIcon(config: config))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(ssoColor(config: config))
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(config.tenantDisplayName)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Text(statusLabel(config: config))
+                            .font(.system(size: 9))
+                            .foregroundStyle(ssoColor(config: config))
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(ssoColor(config: config).opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+
+                Spacer()
+
+                // Disconnect button
+                Button {
+                    showDisconnectConfirm = true
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Disconnect work account")
+            }
+
+            // Tier 2 upgrade prompt (only shown for Tier 1 profiles)
+            if config.tier == .ssoOnly {
+                Button {
+                    showUpgradeWizard = true
+                } label: {
+                    Label("Upgrade to User Enrollment…", systemImage: "arrow.up.circle.fill")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.indigo)
+                .help("Upgrade to full MDM management — scoped to your work volume only")
+            }
+
+            // VPN indicator (Tier 2 only)
+            if config.tier == .userEnrolled, let vpn = config.vpnEndpoint {
+                HStack(spacing: 5) {
+                    Image(systemName: "network.badge.shield.half.filled")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.blue)
+                    Text("VPN: \(vpn)")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.blue)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(ssoColor(config: config).opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
-
-            Spacer()
-
-            // Disconnect button
-            Button {
-                showDisconnectConfirm = true
-            } label: {
-                Image(systemName: "xmark.circle")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Disconnect work account")
         }
     }
 
@@ -117,20 +164,23 @@ public struct CompanyProfileStatusView: View {
     // MARK: - Helpers
 
     private func ssoIcon(config: CompanyProfileConfig) -> String {
-        if !config.isAuthenticated        { return "exclamationmark.shield.fill" }
-        if config.isDeviceRegistered      { return "checkmark.shield.fill" }
+        if !config.isAuthenticated             { return "exclamationmark.shield.fill" }
+        if config.tier == .userEnrolled        { return "checkmark.shield.fill" }
+        if config.isDeviceRegistered           { return "checkmark.shield.fill" }
         return "shield.fill"
     }
 
     private func ssoColor(config: CompanyProfileConfig) -> Color {
-        if !config.isAuthenticated        { return .orange }
-        if config.isDeviceRegistered      { return .green }
+        if !config.isAuthenticated             { return .orange }
+        if config.tier == .userEnrolled        { return .indigo }
+        if config.isDeviceRegistered           { return .green }
         return .blue
     }
 
     private func statusLabel(config: CompanyProfileConfig) -> String {
-        if !config.isAuthenticated        { return "Re-auth required" }
-        if config.isDeviceRegistered      { return "SSO · Entra registered" }
+        if !config.isAuthenticated             { return "Re-auth required" }
+        if config.tier == .userEnrolled        { return "User Enrolled · MDM managed" }
+        if config.isDeviceRegistered           { return "SSO · Entra registered" }
         return "SSO active"
     }
 

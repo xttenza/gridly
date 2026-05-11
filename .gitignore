@@ -1,0 +1,29 @@
+# ── Xcode (generated — run `xcodegen generate` or `make generate`) ───────────
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserdata/
+DerivedData/
+
+# ── Build output ──────────────────────────────────────────────────────────────
+build/
+.build/
+/tmp/GridlyBuild/
+/tmp/GridlyRelease/
+*.dSYM/
+
+# ── Swift Package Manager ─────────────────────────────────────────────────────
+.swiftpm/
+# Package.resolved is committed for apps (reproducible builds)
+# Uncomment the line below if this is a library:
+# Package.resolved
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Credentials — NEVER commit these ─────────────────────────────────────────
+App/Resources/Gridly-Config.plist
+*.p12
+*.mobileprovision
+*.cer
+.env
+secrets.json

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Gridly</string>
+    <key>CFBundleDisplayName</key>
+    <string>Gridly</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.gridly.app</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>Gridly</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSMainStoryboardFile</key>
+    <string></string>
+
+    <!-- LSUIElement = 0: show in Dock (not menu-bar only) -->
+    <key>LSUIElement</key>
+    <false/>
+
+    <!-- Minimum macOS 13.0 -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+
+    <!-- MSAL redirect URI -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>msauth.com.gridly.app</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Privacy usage strings (TCC) -->
+    <key>NSCameraUsageDescription</key>
+    <string>Gridly does not use the camera.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Gridly does not use the microphone.</string>
+
+    <!-- SMJobBless helper tools -->
+    <key>SMPrivilegedExecutables</key>
+    <dict>
+        <key>com.gridly.helper</key>
+        <string>anchor apple generic and identifier "com.gridly.helper" and certificate leaf[subject.OU] = "YOUR_TEAM_ID"</string>
+    </dict>
+
+    <!-- Background modes for LaunchAgent communication -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- All communication goes to Microsoft endpoints over TLS 1.3 -->
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Gridly Production Configuration Template
+    ─────────────────────────────────────────
+    Copy this file to Gridly-Config.plist and fill in your values.
+    Gridly-Config.plist is in .gitignore — NEVER commit it.
+
+    Steps:
+    1. Register an app in Entra ID (https://entra.microsoft.com)
+    2. Copy this file: cp Gridly-Config.plist.example Gridly-Config.plist
+    3. Fill in EntraClientID and EntraTenantID below
+    4. Build and run — Gridly will switch from demo mode to production mode
+-->
+<plist version="1.0">
+<dict>
+    <!-- Azure / Entra ID app registration client ID -->
+    <key>EntraClientID</key>
+    <string>YOUR-CLIENT-ID-HERE</string>
+
+    <!-- Azure / Entra ID tenant ID (or "common" for multi-tenant) -->
+    <key>EntraTenantID</key>
+    <string>YOUR-TENANT-ID-HERE</string>
+
+    <!-- Optional: HTTPS endpoint to ship audit events to your backend -->
+    <!-- Leave empty or omit to keep audit log local-only -->
+    <key>AuditEndpointURL</key>
+    <string></string>
+</dict>
+</plist>

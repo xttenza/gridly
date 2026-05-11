@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    LaunchAgent plist for GridlyAgent.
+    Installed to: ~/Library/LaunchAgents/com.gridly.agent.plist
+    by the privileged helper (SMJobBless) at enrollment time.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.gridly.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Gridly.app/Contents/Library/LaunchAgents/GridlyAgent</string>
+    </array>
+
+    <!-- Start immediately at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart if it crashes — workspace must always be guarded -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <!-- Rate-limit restarts: wait 10s before restarting on failure -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Log stdout/stderr to /tmp for debugging -->
+    <key>StandardOutPath</key>
+    <string>/tmp/com.gridly.agent.stdout</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/com.gridly.agent.stderr</string>
+
+    <!-- Run in user's session — not as root -->
+    <key>SessionCreate</key>
+    <true/>
+
+    <!-- XPC Mach service registration -->
+    <key>MachServices</key>
+    <dict>
+        <key>com.gridly.agent.xpc</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── macOS build & test ────────────────────────────────────────────────────
+  macos:
+    name: macOS — Build & Test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (GridlyLocal)
+        run: |
+          /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+            -project Gridly.xcodeproj \
+            -scheme GridlyLocal \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            build | xcbeautify --quiet
+
+      - name: Run unit tests
+        run: |
+          /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+            -project Gridly.xcodeproj \
+            -scheme Gridly \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            test | xcbeautify --quiet
+
+  # ── iOS build (typecheck only — no simulator runtime in CI) ───────────────
+  ios:
+    name: iOS — Typecheck
+    runs-on: macos-15
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Typecheck GridlyMobile sources
+        run: |
+          SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+          SWIFTC=$(xcrun --find swiftc)
+          $SWIFTC \
+            -sdk "$SDK" \
+            -target arm64-apple-ios16.0-simulator \
+            -typecheck \
+            -module-name GridlyMobile \
+            GridlyMobile/Shared/Profile.swift \
+            GridlyMobile/Shared/ProfileManager.swift \
+            GridlyMobile/GridlyMobileApp.swift \
+            GridlyMobile/RootView.swift \
+            GridlyMobile/Views/ProfileListView.swift \
+            GridlyMobile/Views/ProfileDetailView.swift \
+            GridlyMobile/Views/DashboardView.swift \
+            GridlyMobile/Views/AllAppsView.swift \
+            GridlyMobile/Views/AuditLogView.swift \
+            GridlyMobile/Views/SettingsView.swift

@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    name: Build DMG & Publish Release
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: write   # needed to create GitHub Releases
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install xcodegen python3 pillow 2>/dev/null || true
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (Release)
+        run: |
+          /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+            -project Gridly.xcodeproj \
+            -scheme GridlyLocal \
+            -configuration Release \
+            CONFIGURATION_BUILD_DIR=/tmp/GridlyRelease \
+            CODE_SIGN_IDENTITY="-" \
+            build
+
+      - name: Package DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME}"   # e.g. v1.0.0
+
+          # Stage folder
+          rm -rf /tmp/GridlyDMG && mkdir /tmp/GridlyDMG
+          cp -R /tmp/GridlyRelease/Gridly.app /tmp/GridlyDMG/
+          ln -s /Applications /tmp/GridlyDMG/Applications
+
+          # Writable DMG
+          hdiutil create \
+            -volname "Gridly" \
+            -srcfolder /tmp/GridlyDMG \
+            -ov -format UDRW -size 100m \
+            /tmp/GridlyRW.dmg
+
+          # Mount, set DS_Store, unmount
+          hdiutil attach /tmp/GridlyRW.dmg -readwrite -noverify -noautoopen -quiet
+          sleep 2
+          hdiutil detach "/Volumes/Gridly" -force -quiet
+
+          # Compress to final DMG
+          hdiutil convert /tmp/GridlyRW.dmg \
+            -format UDZO -imagekey zlib-level=9 \
+            -o "/tmp/Gridly-${VERSION}.dmg"
+
+          echo "DMG_PATH=/tmp/Gridly-${VERSION}.dmg" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          # If no CHANGELOG.md, use a default message
+          if [ -f CHANGELOG.md ]; then
+            # Extract section for this version
+            awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{found=0} found{print}" CHANGELOG.md > /tmp/release_notes.md
+          fi
+          if [ ! -s /tmp/release_notes.md ]; then
+            echo "See [README](https://github.com/${{ github.repository }}#readme) for full documentation." > /tmp/release_notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Gridly ${{ env.VERSION }}"
+          body_path: /tmp/release_notes.md
+          files: ${{ env.DMG_PATH }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

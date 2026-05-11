@@ -55,7 +55,7 @@ let package = Package(
         // MARK: - CSWorkspace
         .target(
             name: "CSWorkspace",
-            dependencies: ["CSCore", "CSCrypto", "CSAudit"],
+            dependencies: ["CSCore", "CSCrypto", "CSAudit", "CSAuth"],
             path: "Sources/CSWorkspace"
         ),
 
@@ -91,7 +91,7 @@ let package = Package(
         // MARK: - CSUI
         .target(
             name: "CSUI",
-            dependencies: ["CSCore", "CSWorkspace", "CSPolicy", "CSGraph", "CSAudit"],
+            dependencies: ["CSCore", "CSAuth", "CSWorkspace", "CSPolicy", "CSGraph", "CSAudit"],
             path: "Sources/CSUI"
         ),
 

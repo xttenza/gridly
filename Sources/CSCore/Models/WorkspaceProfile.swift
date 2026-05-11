@@ -22,13 +22,18 @@ public struct WorkspaceProfile: Identifiable, Codable, Sendable, Hashable {
     public let createdAt: Date
     public var lastAccessedAt: Date?
 
+    /// When non-nil this profile is connected to a Microsoft company/work identity.
+    /// See `CompanyProfileConfig` for details on what the company can and cannot access.
+    public var companyConfig: CompanyProfileConfig?
+
     public init(
         id: UUID = UUID(),
         name: String,
         accountIdentifier: String = "",
         color: ProfileColor = .blue,
         createdAt: Date = Date(),
-        lastAccessedAt: Date? = nil
+        lastAccessedAt: Date? = nil,
+        companyConfig: CompanyProfileConfig? = nil
     ) {
         self.id = id
         self.name = name
@@ -36,7 +41,14 @@ public struct WorkspaceProfile: Identifiable, Codable, Sendable, Hashable {
         self.color = color
         self.createdAt = createdAt
         self.lastAccessedAt = lastAccessedAt
+        self.companyConfig = companyConfig
     }
+
+    /// Whether this profile is connected to a Microsoft company tenant.
+    public var isCompanyProfile: Bool { companyConfig != nil }
+
+    /// Whether broker SSO is configured and authenticated for this profile.
+    public var isSSOReady: Bool { companyConfig?.isAuthenticated == true }
 
     // MARK: - Derived Identifiers
 

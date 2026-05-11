@@ -5,7 +5,8 @@ import CSWorkspace
 // MARK: - ProfileCardView
 
 /// A card representing one WorkspaceProfile. Shows mount state, account info,
-/// passphrase unlock UI, and quick-launch buttons for managed apps.
+/// passphrase unlock UI, quick-launch buttons for managed apps, and company
+/// profile SSO status.
 public struct ProfileCardView: View {
 
     public let profile: WorkspaceProfile
@@ -14,6 +15,10 @@ public struct ProfileCardView: View {
     /// Bound to the parent view — sheets must present from outside LazyVGrid on macOS.
     @Binding var appLaunchProfile: WorkspaceProfile?
     @Binding var editProfile: WorkspaceProfile?
+
+    /// Local mutable copy used by CompanyProfileStatusView so it can write
+    /// companyConfig back without requiring a binding through the whole stack.
+    @State private var mutableProfile: WorkspaceProfile
 
     @State private var passphrase = ""
     @State private var isUnlocking = false
@@ -32,6 +37,7 @@ public struct ProfileCardView: View {
         self.profileManager = profileManager
         self._appLaunchProfile = appLaunchProfile
         self._editProfile = editProfile
+        self._mutableProfile = State(initialValue: profile)
     }
 
     public var body: some View {
@@ -52,6 +58,10 @@ public struct ProfileCardView: View {
                 .stroke(isMounted ? profile.color.swiftUIColor.opacity(0.4) : Color.secondary.opacity(0.15), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(isMounted ? 0.08 : 0.04), radius: isMounted ? 8 : 4, y: 2)
+        .onChange(of: profile) { updated in
+            // Keep the local mutable copy in sync when the parent list refreshes
+            mutableProfile = updated
+        }
         .confirmationDialog(
             "Delete '\(profile.name)'?",
             isPresented: $showingDeleteConfirm,
@@ -143,6 +153,11 @@ public struct ProfileCardView: View {
 
     private var mountedContent: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Company SSO banner (shown only when a work account is connected)
+            if let config = mutableProfile.companyConfig {
+                CompanyProfileSSOBanner(config: config)
+            }
+
             // Running-apps summary
             let running = mountState.runningAppBundleIDs
             if !running.isEmpty {
@@ -248,6 +263,11 @@ public struct ProfileCardView: View {
             .buttonStyle(.borderedProminent)
             .tint(profile.color.swiftUIColor)
             .disabled(passphrase.isEmpty || isUnlocking)
+
+            Divider()
+
+            // Company / work account section
+            CompanyProfileStatusView(profile: $mutableProfile, profileManager: profileManager)
         }
         .onAppear { passphraseFocused = false }
     }

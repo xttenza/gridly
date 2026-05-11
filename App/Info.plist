@@ -42,6 +42,16 @@
         </dict>
     </array>
 
+    <!-- MSAL broker detection: allows MSAL to query whether Company Portal
+         and Microsoft Authenticator are installed (required for broker SSO). -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>msauthv2</string>
+        <string>msauthv3</string>
+        <string>msauth</string>
+        <string>companyportal</string>
+    </array>
+
     <!-- Privacy usage strings (TCC) -->
     <key>NSCameraUsageDescription</key>
     <string>Gridly does not use the camera.</string>

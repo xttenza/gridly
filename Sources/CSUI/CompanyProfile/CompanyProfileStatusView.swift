@@ -42,6 +42,10 @@ public struct CompanyProfileStatusView: View {
                 onComplete: { config in
                     var updated = profile
                     updated.companyConfig = config
+                    // Auto-fill the profile's account identifier from the signed-in UPN
+                    if let upn = config.userPrincipalName, !upn.isEmpty {
+                        updated.accountIdentifier = upn
+                    }
                     profileManager.updateProfile(updated)
                     profile = updated
                 },

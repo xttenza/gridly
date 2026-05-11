@@ -26,6 +26,11 @@ public struct ProfileCardView: View {
     @State private var showingDeleteConfirm = false
     @FocusState private var passphraseFocused: Bool
 
+    /// Inline account identifier editing
+    @State private var editingAccount = false
+    @State private var accountDraft = ""
+    @FocusState private var accountFieldFocused: Bool
+
     private var isMounted: Bool { profileManager.isMounted(profile) }
     private var mountState: ProfileMountState { profileManager.mountStates[profile.id] ?? .init() }
 
@@ -93,16 +98,7 @@ public struct ProfileCardView: View {
                 Text(profile.name)
                     .font(.headline)
                     .lineLimit(1)
-                if !profile.accountIdentifier.isEmpty {
-                    Text(profile.accountIdentifier)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else {
-                    Text("No account configured")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
+                inlineAccountField
             }
 
             Spacer()
@@ -127,6 +123,66 @@ public struct ProfileCardView: View {
             .menuStyle(.borderlessButton)
             .frame(width: 24)
         }
+    }
+
+    // MARK: - Inline account edit
+
+    private var inlineAccountField: some View {
+        Group {
+            if editingAccount {
+                TextField("work@company.com", text: $accountDraft)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textFieldStyle(.plain)
+                    .focused($accountFieldFocused)
+                    .onSubmit { saveAccount() }
+                    .onExitCommand { editingAccount = false }       // Esc cancels
+                    .onChange(of: accountFieldFocused) { focused in
+                        if !focused { saveAccount() }              // blur saves
+                    }
+                    .disableAutocorrection(true)
+            } else {
+                let label = profile.accountIdentifier.isEmpty
+                    ? "Add account…"
+                    : profile.accountIdentifier
+                let isFilled = !profile.accountIdentifier.isEmpty
+
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(isFilled ? .secondary : .tertiary)
+                    .lineLimit(1)
+                    .contentShape(Rectangle())
+                    .onTapGesture { beginEditingAccount() }
+                    .help(isFilled ? "Click to edit account address" : "Click to add a work email")
+                    .overlay(alignment: .trailing) {
+                        if isFilled {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 3)
+                        }
+                    }
+            }
+        }
+    }
+
+    private func beginEditingAccount() {
+        accountDraft = profile.accountIdentifier
+        editingAccount = true
+        // Focus needs a tiny delay so the TextField is in the view hierarchy
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            accountFieldFocused = true
+        }
+    }
+
+    private func saveAccount() {
+        editingAccount = false
+        let trimmed = accountDraft.trimmingCharacters(in: .whitespaces)
+        guard trimmed != profile.accountIdentifier else { return }
+        var updated = mutableProfile
+        updated.accountIdentifier = trimmed
+        profileManager.updateProfile(updated)
+        mutableProfile = updated
     }
 
     private var statusBadge: some View {

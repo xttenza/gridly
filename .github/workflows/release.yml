@@ -18,12 +18,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install xcodegen python3 pillow 2>/dev/null || true
+        run: |
+          brew install xcodegen 2>/dev/null || true
+          pip3 install pillow --quiet 2>/dev/null || true
 
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build (Release)
+      - name: Resolve Swift packages
+        run: |
+          /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+            -project Gridly.xcodeproj \
+            -scheme GridlyLocal \
+            -resolvePackageDependencies
+
+      - name: Build (Release, ad-hoc signed)
         run: |
           /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
             -project Gridly.xcodeproj \
@@ -31,48 +40,54 @@ jobs:
             -configuration Release \
             CONFIGURATION_BUILD_DIR=/tmp/GridlyRelease \
             CODE_SIGN_IDENTITY="-" \
-            build
+            build | tail -5
+          echo "✓ Build complete"
+          ls /tmp/GridlyRelease/
 
       - name: Package DMG
         run: |
-          VERSION="${GITHUB_REF_NAME}"   # e.g. v1.0.0
+          VERSION="${GITHUB_REF_NAME}"   # e.g. v1.2.0
+          DMG_NAME="Gridly-${VERSION}.dmg"
 
           # Stage folder
           rm -rf /tmp/GridlyDMG && mkdir /tmp/GridlyDMG
           cp -R /tmp/GridlyRelease/Gridly.app /tmp/GridlyDMG/
           ln -s /Applications /tmp/GridlyDMG/Applications
 
-          # Writable DMG
+          # Create compressed DMG directly (avoids UDRW mount/detach which can
+          # fail on hosted runners due to sandbox restrictions)
           hdiutil create \
             -volname "Gridly" \
             -srcfolder /tmp/GridlyDMG \
-            -ov -format UDRW -size 100m \
-            /tmp/GridlyRW.dmg
+            -ov \
+            -format UDZO \
+            -imagekey zlib-level=9 \
+            "/tmp/${DMG_NAME}"
 
-          # Mount, set DS_Store, unmount
-          hdiutil attach /tmp/GridlyRW.dmg -readwrite -noverify -noautoopen -quiet
-          sleep 2
-          hdiutil detach "/Volumes/Gridly" -force -quiet
-
-          # Compress to final DMG
-          hdiutil convert /tmp/GridlyRW.dmg \
-            -format UDZO -imagekey zlib-level=9 \
-            -o "/tmp/Gridly-${VERSION}.dmg"
-
-          echo "DMG_PATH=/tmp/Gridly-${VERSION}.dmg" >> $GITHUB_ENV
+          ls -lh "/tmp/${DMG_NAME}"
+          echo "DMG_PATH=/tmp/${DMG_NAME}" >> $GITHUB_ENV
+          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Extract release notes from CHANGELOG
         id: notes
         run: |
-          # If no CHANGELOG.md, use a default message
+          VERSION="${GITHUB_REF_NAME}"
+          NOTES_FILE=/tmp/release_notes.md
+
           if [ -f CHANGELOG.md ]; then
-            # Extract section for this version
-            awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{found=0} found{print}" CHANGELOG.md > /tmp/release_notes.md
+            # Extract the block for this version (between ## [vX.Y.Z] headings)
+            awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" \
+              CHANGELOG.md > "$NOTES_FILE"
           fi
-          if [ ! -s /tmp/release_notes.md ]; then
-            echo "See [README](https://github.com/${{ github.repository }}#readme) for full documentation." > /tmp/release_notes.md
+
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "Release \`${VERSION}\` — see [README](https://github.com/${{ github.repository }}#readme) for full documentation." \
+              > "$NOTES_FILE"
           fi
+
+          echo "--- Release notes ---"
+          cat "$NOTES_FILE"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

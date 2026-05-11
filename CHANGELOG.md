@@ -1,0 +1,53 @@
+# Changelog
+
+All notable changes to Gridly are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+---
+
+## [v1.2.0]
+
+### Added
+- **Tier 2: Apple User Enrollment** — MDM management scoped exclusively to the work volume. Company Portal guides enrollment; Gridly detects the MDM profile automatically via the `profiles` CLI.
+- **Per-profile VPN** — `PerAppVPNManager` wraps `NETunnelProviderManager` to configure a tunnel that activates only for a specific profile's apps. Degrades gracefully in ad-hoc builds.
+- `UserEnrollmentWizardView` — guided Tier 2 upgrade sheet with live step indicators and a System Settings deep link.
+- `WizardPage` extracted as a shared layout container used by both wizard sheets.
+- `CompanyProfileConfig` gains `mdmServerURL`, `mdmOrganisationName`, `isUserEnrollment`, `userEnrolledAt`, `vpnEndpoint`, `userPrincipalName`.
+
+### Changed
+- Profile card now shows "Upgrade to User Enrollment" button for Tier 1 profiles.
+- Tier 2 profiles show an indigo badge and VPN endpoint label.
+- `GridlyAgent` Xcode target now correctly declares `CSAuth` as a dependency (fixes build warning).
+
+---
+
+## [v1.1.0]
+
+### Added
+- **Tier 1: Microsoft Company Profile SSO Bridge** — connect a workspace profile to a Microsoft Entra ID tenant using Company Portal as a secure broker.
+- `TenantDiscovery` — unauthenticated UserRealm + OpenID Connect tenant lookup.
+- `CompanyPortalBridge` — MSAL broker integration (interactive, silent token acquisition, device registration detection, sign-out).
+- `CompanyProfileManager` — wizard state machine (idle → discovering → tenant found → portal check → consent → authenticating → complete).
+- `CompanyProfileWizardView` — 5-step guided setup sheet.
+- `CompanyProfileStatusView` + `CompanyProfileSSOBanner` — profile card badges and "Connect Work Account" CTA.
+- `LSApplicationQueriesSchemes` in `App/Info.plist` for MSAL broker detection (`msauthv2`, `msauthv3`).
+
+### Changed
+- `WorkspaceProfile` gains `companyConfig`, `isCompanyProfile`, `isSSOReady`.
+- `Package.swift`: `CSWorkspace` and `CSUI` now correctly depend on `CSAuth`.
+
+---
+
+## [v1.0.0]
+
+### Added
+- **Workspace profiles** — create, unlock, lock, and delete AES-256 encrypted APFS sparse bundles.
+- **Isolated HOME directories** — every app launched in a profile sees its volume as `$HOME`.
+- **App launcher** — launch Microsoft Teams, Outlook, OneDrive, Edge, Slack, Zoom, and more scoped to a profile.
+- **Per-profile Keychain** — credentials stored inside the encrypted volume; MSAL token caches fully isolated.
+- **Compliance dashboard** — mount state, running apps, and compliance status at a glance.
+- **Tamper-evident audit log** — HMAC-signed event log using GRDB with `DatabaseMigrator`.
+- **GridlyAgent** LaunchAgent for background monitoring.
+- **GridlyHelper** SMJobBless privileged helper for hdiutil operations.
+- **GridlyMobile** — iPhone + iPad companion app (SwiftUI, `NavigationSplitView`).
+- GitHub Actions CI (push) and release (tag) workflows.

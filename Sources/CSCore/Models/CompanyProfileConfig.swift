@@ -46,6 +46,11 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
     /// Whether the user has completed the broker sign-in step.
     public var isAuthenticated: Bool
 
+    /// The User Principal Name (UPN / work email) returned by the broker after sign-in.
+    /// Automatically populated from the MSAL token result; used to display the signed-in
+    /// identity on the profile card.
+    public var userPrincipalName: String?
+
     /// The MSAL account identifier (opaque) returned after successful broker auth.
     /// Used to acquire tokens silently on subsequent launches.
     public var brokerAccountID: String?
@@ -90,6 +95,7 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
         clientID: String = CompanyProfileConfig.defaultClientID,
         tier: Tier = .ssoOnly,
         isAuthenticated: Bool = false,
+        userPrincipalName: String? = nil,
         brokerAccountID: String? = nil,
         enrolledAt: Date = Date(),
         lastBrokerAuthAt: Date? = nil,
@@ -107,6 +113,7 @@ public struct CompanyProfileConfig: Codable, Sendable, Hashable {
         self.clientID = clientID
         self.tier = tier
         self.isAuthenticated = isAuthenticated
+        self.userPrincipalName = userPrincipalName
         self.brokerAccountID = brokerAccountID
         self.enrolledAt = enrolledAt
         self.lastBrokerAuthAt = lastBrokerAuthAt

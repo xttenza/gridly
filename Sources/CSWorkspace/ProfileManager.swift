@@ -222,6 +222,20 @@ public final class ProfileManager: ObservableObject {
         mountStates[profile.id] = ProfileMountState(isMounted: true)
         log.info("Mounted profile '\(profile.name, privacy: .public)'")
         audit(.profileMounted, profile: profile)
+
+        // Silently refresh the SSO broker session if this is a company profile.
+        // Non-blocking: runs in background so mount doesn't wait on network.
+        if let companyConfig = profile.companyConfig, companyConfig.isAuthenticated {
+            Task {
+                let mgr = CompanyProfileManager()
+                let ok = await mgr.refreshSilently(config: companyConfig)
+                if ok {
+                    log.info("Silent SSO refresh succeeded for '\(profile.name, privacy: .public)'")
+                } else {
+                    log.warning("Silent SSO refresh failed for '\(profile.name, privacy: .public)' — interactive re-auth may be needed")
+                }
+            }
+        }
     }
 
     /// Unmounts the profile's APFS volume, locking all data on disk.

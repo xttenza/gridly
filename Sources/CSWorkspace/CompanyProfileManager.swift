@@ -104,6 +104,7 @@ public final class CompanyProfileManager: ObservableObject {
                 clientID: clientID,
                 tier: .ssoOnly,
                 isAuthenticated: true,
+                userPrincipalName: tokenResult.upn.isEmpty ? loginHint : tokenResult.upn,
                 brokerAccountID: tokenResult.accountID,
                 enrolledAt: Date(),
                 lastBrokerAuthAt: Date(),
@@ -173,6 +174,7 @@ public final class CompanyProfileManager: ObservableObject {
             config.brokerAccountID = result.accountID
             config.lastBrokerAuthAt = Date()
             config.isAuthenticated = true
+            if !result.upn.isEmpty { config.userPrincipalName = result.upn }
             step = .complete(config)
             return true
         } catch {

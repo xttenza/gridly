@@ -88,6 +88,7 @@ targets:
       - target: CSCore
       - target: CSCrypto
       - target: CSAudit
+      - target: CSAuth
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.gridly.csworkspace

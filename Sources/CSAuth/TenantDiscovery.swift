@@ -74,30 +74,83 @@ public actor TenantDiscovery {
         }
         let domain = parts[1]
 
-        // Reject well-known personal domains immediately
+        // Reject well-known personal consumer domains immediately (fast path)
         if Self.personalDomains.contains(domain) {
             throw TenantDiscoveryError.personalAccount(domain)
         }
 
-        // Step 1: UserRealm — is this a managed domain?
-        let realm = try await fetchUserRealm(email: email, domain: domain)
-        guard realm.isManaged else {
+        // Step 1: Try to find a managed tenant.
+        // Microsoft's UserRealm API may return "Unknown" for valid corporate
+        // subdomains (e.g. mail.contoso.com) even when the parent domain
+        // (contoso.com) is a proper Entra ID tenant.  We therefore try the
+        // email's exact domain first, then walk up the domain hierarchy until
+        // we find a managed realm or exhaust all candidates.
+        let candidateDomains = Self.domainCandidates(for: domain)
+        var lastRealm: RealmResult?
+        var managedDomain: String?
+
+        for candidate in candidateDomains {
+            // Skip personal domains regardless of position in the hierarchy
+            if Self.personalDomains.contains(candidate) { continue }
+
+            let candidateEmail = parts[0] + "@" + candidate
+            if let realm = try? await fetchUserRealm(email: candidateEmail, domain: candidate) {
+                lastRealm = realm
+                if realm.isManaged {
+                    managedDomain = candidate
+                    log.info("Managed realm found for candidate \(candidate, privacy: .public)")
+                    break
+                }
+            }
+        }
+
+        // Step 2: If no managed realm found via UserRealm, try OpenID discovery
+        // directly — some tenants (federated IdPs, on-prem hybrid) don't surface
+        // correctly in UserRealm but do have a valid /.well-known/openid-configuration.
+        if managedDomain == nil {
+            for candidate in candidateDomains {
+                if Self.personalDomains.contains(candidate) { continue }
+                if let tenantID = try? await fetchTenantID(domain: candidate), !tenantID.isEmpty {
+                    log.info("Tenant found via OpenID discovery for \(candidate, privacy: .public) (UserRealm was inconclusive)")
+                    managedDomain = candidate
+                    break
+                }
+            }
+        }
+
+        guard let resolvedDomain = managedDomain else {
+            // All candidates failed — most likely a genuine consumer account
             throw TenantDiscoveryError.personalAccount(domain)
         }
 
-        // Step 2: OpenID discovery — get tenant ID and display name
-        let tenantID = try await fetchTenantID(domain: domain)
-        let displayName = try await fetchOrganisationName(tenantID: tenantID, domain: domain)
+        // Step 3: Resolve tenant ID and display name
+        let tenantID = try await fetchTenantID(domain: resolvedDomain)
+        let displayName = try await fetchOrganisationName(tenantID: tenantID, domain: resolvedDomain)
+        let requiresCA = lastRealm?.requiresConditionalAccess ?? false
 
-        log.info("Discovered tenant \(tenantID, privacy: .public) for domain \(domain, privacy: .public)")
+        log.info("Discovered tenant \(tenantID, privacy: .public) for domain \(resolvedDomain, privacy: .public)")
 
         return TenantInfo(
             tenantID: tenantID,
-            domain: domain,
+            domain: resolvedDomain,
             displayName: displayName,
             isManaged: true,
-            requiresConditionalAccess: realm.requiresConditionalAccess
+            requiresConditionalAccess: requiresCA
         )
+    }
+
+    /// Returns the domain and its parent domains to try in order.
+    /// e.g. "mail.contoso.com" → ["mail.contoso.com", "contoso.com"]
+    /// Stops before generic TLDs (single-component domains are not tried).
+    private static func domainCandidates(for domain: String) -> [String] {
+        var candidates: [String] = [domain]
+        var components = domain.components(separatedBy: ".")
+        // Walk up: remove the leftmost component each time, stop when only TLD remains
+        while components.count > 2 {
+            components.removeFirst()
+            candidates.append(components.joined(separator: "."))
+        }
+        return candidates
     }
 
     // MARK: - UserRealm API

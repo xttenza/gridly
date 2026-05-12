@@ -237,8 +237,8 @@ public final class ProfileManager: ObservableObject {
             let expiresAt = config.lastBrokerAuthAt?.addingTimeInterval(3600)
                 ?? Date().addingTimeInterval(3600)
             let realSession = WorkspaceSession(
-                userPrincipalName: upn ?? config.tenantDomain,
-                displayName: upn ?? config.tenantDisplayName,
+                userPrincipalName: upn,
+                displayName: upn,
                 tenantID: config.tenantID,
                 accessTokenExpiresAt: expiresAt,
                 isAuthenticated: true,

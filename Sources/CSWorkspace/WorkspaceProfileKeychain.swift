@@ -102,13 +102,14 @@ public enum WorkspaceProfileKeychain {
         // prompted to access it, they just search and find (or don't find) items.
         allowAllApplicationsAccess(keychainPath: url.path, passphrase: passphrase)
 
-        // Build new search list: profile keychain first, then existing entries
+        // Build new search list: profile keychain first, then existing entries.
+        // The profile keychain leads the list so MSAL *reads* find profile tokens
+        // first. We intentionally do NOT change the default keychain — login.keychain-db
+        // stays the default so Chromium-based apps (Edge, Chrome) can still write
+        // browser passwords without hitting "Keychain Not Found".
         let existing = currentSearchList().filter { $0 != url.path }
         let newList  = [url.path] + existing
         setSearchList(newList)
-
-        // Make it the default so new Keychain items (MSAL tokens) land here
-        setDefaultKeychain(url: url)
 
         log.info("Activated profile keychain for '\(profile.name, privacy: .public)'")
     }
@@ -127,7 +128,7 @@ public enum WorkspaceProfileKeychain {
                     description: "lock keychain for '\(profile.name)'")
 
         removeFromSearchList(url: url)
-        restoreLoginKeychainAsDefault()
+        // No need to restore the default keychain — we never changed it.
 
         log.info("Deactivated profile keychain for '\(profile.name, privacy: .public)'")
     }
@@ -152,12 +153,7 @@ public enum WorkspaceProfileKeychain {
         log.info("Removing \(current.count - valid.count) stale keychain entries from search list")
         setSearchList(valid)
 
-        // If the default keychain is now stale, restore login.keychain-db
-        let defaultKC = runSecurityCapturing(args: ["default-keychain", "-d", "user"])
-            .trimmingCharacters(in: .init(charactersIn: " \"\n\t"))
-        if !FileManager.default.fileExists(atPath: defaultKC) {
-            restoreLoginKeychainAsDefault()
-        }
+        // We never change the default keychain, so no restoration needed here.
     }
 
     // MARK: - ACL helpers
@@ -257,20 +253,9 @@ public enum WorkspaceProfileKeychain {
         setSearchList(current)
     }
 
-    private static func setDefaultKeychain(url: URL) {
-        runSecurity(args: ["default-keychain", "-d", "user", "-s", url.path],
-                    description: "set default keychain")
-    }
-
-    private static func restoreLoginKeychainAsDefault() {
-        // Find the user's login keychain from the current search list
-        let loginKeychain = currentSearchList().first {
-            $0.hasSuffix("login.keychain-db") || $0.hasSuffix("login.keychain")
-        } ?? "\(NSHomeDirectory())/Library/Keychains/login.keychain-db"
-
-        runSecurity(args: ["default-keychain", "-d", "user", "-s", loginKeychain],
-                    description: "restore login.keychain-db as default")
-    }
+    // setDefaultKeychain / restoreLoginKeychainAsDefault intentionally removed.
+    // We never change the default keychain — login.keychain-db stays default so
+    // Chromium-based apps (Edge, Chrome) can store browser passwords without error.
 
     // MARK: - Process Helpers
 

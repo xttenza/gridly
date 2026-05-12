@@ -19,6 +19,10 @@ public struct CompanyProfileStatusView: View {
     @Binding var profile: WorkspaceProfile
     @ObservedObject public var profileManager: ProfileManager
 
+    /// Pulled from the SwiftUI environment — injected at WorkspaceDashboardView root.
+    /// Falls back to the generic Microsoft Office client ID in demo / unconfigured mode.
+    @Environment(\.entraClientID) private var clientID
+
     @State private var showWizard = false
     @State private var showUpgradeWizard = false
     @State private var showDisconnectConfirm = false

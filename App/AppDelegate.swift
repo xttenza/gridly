@@ -296,7 +296,8 @@ public final class AppContainer {
             auditLogger: auditLogger,
             tamperDetector: tamperDetector,
             remoteWipe: remoteWipeHandler,
-            profileManager: profileManager
+            profileManager: profileManager,
+            entraClientID: config.entraClientID
         )
     }
 

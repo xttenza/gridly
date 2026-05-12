@@ -33,6 +33,9 @@ public struct WorkspaceDashboardView: View {
             Text(viewModel.complianceState.description)
         }
         .onAppear { viewModel.refresh() }
+        // Inject the app's Azure AD client ID so CompanyProfileStatusView /
+        // CompanyProfileWizardView use the correct registration when calling MSAL.
+        .environment(\.entraClientID, viewModel.entraClientID)
     }
 
     // MARK: - Detail Router

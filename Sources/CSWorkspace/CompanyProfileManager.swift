@@ -129,10 +129,33 @@ public final class CompanyProfileManager: ObservableObject {
             return config
 
         } catch {
-            step = .failed(error.localizedDescription)
+            let friendlyMessage = Self.friendlyMSALError(error)
+            step = .failed(friendlyMessage)
             log.error("Broker authentication failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
+    }
+
+    /// Translates MSAL raw errors into actionable messages.
+    private static func friendlyMSALError(_ error: Error) -> String {
+        let description = error.localizedDescription
+        let nsError = error as NSError
+
+        // MSALErrorDomain -50000 = internal MSAL init failure — almost always a
+        // client ID / redirect URI mismatch.  Guide the user to check config.
+        if nsError.domain == "MSALErrorDomain" && nsError.code == -50000 {
+            return "Sign-in could not start (MSAL configuration error). " +
+                   "Make sure the Azure AD app registration includes " +
+                   "\"msauth.\(Bundle.main.bundleIdentifier ?? "com.gridly.app")://auth\" " +
+                   "as a redirect URI under Mobile and Desktop applications."
+        }
+
+        // MSALErrorDomain -50002 = user cancelled
+        if nsError.domain == "MSALErrorDomain" && nsError.code == -50002 {
+            return "Sign-in was cancelled."
+        }
+
+        return description
     }
 
     // MARK: - Post-setup: silent refresh

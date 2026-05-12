@@ -69,3 +69,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Session email cannot be changed** — the status bar now shows a pencil icon (demo mode only) next to the signed-in email. Click it to type your own address; press Return or ✓ to confirm. The value is persisted in UserDefaults so it survives restarts. In production (MSAL-authenticated) mode the field remains read-only as it reflects your real Entra ID account.
 - Demo profiles no longer start pre-filled with `jane.doe@contoso.com` — account identifier fields start blank so you fill in your own details.
 
+
+---
+
+## [v1.3.5]
+
+### Fixed
+- **MSALErrorDomain error -50000 when connecting work account** — broker (Company Portal) mode is now disabled for ad-hoc signed builds. Broker requires a Developer ID certificate and a shared keychain entitlement; without them MSAL fails at initialisation. The embedded WKWebView sign-in path is used instead and works on all signing configurations.
+- **Company profile wizard used wrong Azure AD client ID** — the wizard now reads `entraClientID` from `Gridly-Config.plist` (the same registration used for the main sign-in) instead of the hardcoded Microsoft Office client ID. The two must match for the redirect URI `msauth.com.gridly.app://auth` to be accepted by Azure AD.
+- Friendlier error messages for MSAL -50000 (config mismatch) and -50002 (user cancelled) instead of raw `NSError` descriptions.
+

@@ -93,9 +93,18 @@ public actor CompanyPortalBridge {
 
     // MARK: - MSAL application factory
 
-    /// Builds an MSALPublicClientApplication configured for broker SSO.
-    /// Broker is set to `.auto` so MSAL uses Company Portal when available
-    /// and falls back to an in-app web view when not.
+    /// Builds an MSALPublicClientApplication configured for embedded-WebView auth.
+    ///
+    /// Broker (Company Portal) is explicitly disabled here because broker mode
+    /// requires a Developer ID signature and a shared keychain access group
+    /// (`com.microsoft.adalcache`).  Ad-hoc signed builds lack both, causing
+    /// MSALErrorDomain -50000 at initialisation time.  The embedded WKWebView
+    /// path works correctly for all signing configurations and is the right
+    /// default for a distribution that does not go through the Mac App Store.
+    ///
+    /// If a future production build is Developer-ID signed and has the keychain
+    /// entitlement, change this to `.auto` and add the access group to
+    /// Gridly.entitlements.
     private func makeMSALApp(clientID: String, tenantID: String) throws -> MSALPublicClientApplication {
         let authorityURL = URL(string: "https://login.microsoftonline.com/\(tenantID)")!
         let authority = try MSALAADAuthority(url: authorityURL)
@@ -109,8 +118,9 @@ public actor CompanyPortalBridge {
         // CP1 capability signals Continuous Access Evaluation support
         config.clientApplicationCapabilities = ["CP1"]
 
-        // Auto: uses Company Portal when installed, falls back to embedded WebView
-        MSALGlobalConfig.brokerAvailability = .auto
+        // Disable broker globally for this call — WKWebView handles sign-in.
+        // This must be set before creating the application instance.
+        MSALGlobalConfig.brokerAvailability = .none
 
         return try MSALPublicClientApplication(configuration: config)
     }

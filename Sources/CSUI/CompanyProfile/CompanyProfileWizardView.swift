@@ -20,6 +20,13 @@ public struct CompanyProfileWizardView: View {
     var onComplete: (CompanyProfileConfig) -> Void
     var onCancel: () -> Void
 
+    // MARK: - Environment
+
+    /// Azure AD client ID registered for this Gridly installation.
+    /// Injected by WorkspaceDashboardView via `.environment(\.entraClientID, …)`.
+    /// Falls back to the generic Microsoft Office ID when unconfigured.
+    @Environment(\.entraClientID) private var clientID
+
     // MARK: - State
 
     @StateObject private var manager = CompanyProfileManager()
@@ -230,6 +237,7 @@ public struct CompanyProfileWizardView: View {
                     _ = await manager.authenticate(
                         tenantInfo: info,
                         loginHint: email,
+                        clientID: clientID,
                         presentingWindow: window
                     )
                 }

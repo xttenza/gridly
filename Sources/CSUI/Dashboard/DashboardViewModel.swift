@@ -45,6 +45,10 @@ public final class DashboardViewModel: ObservableObject {
     /// `true` when running in demo mode — enables editable session identity in the UI.
     public private(set) var isDemoMode: Bool = false
 
+    /// The Azure AD client ID registered for this app. Passed to the Company Profile wizard
+    /// so it uses the real registration instead of the generic Microsoft Office client ID.
+    public private(set) var entraClientID: String = ""
+
     private var cancellables = Set<AnyCancellable>()
     private var policyPollingTask: Task<Void, Never>?
 
@@ -60,7 +64,8 @@ public final class DashboardViewModel: ObservableObject {
         tamperDetector: TamperDetector,
         remoteWipe: RemoteWipeHandler,
         profileManager: ProfileManager? = nil,
-        isDemoMode: Bool = false
+        isDemoMode: Bool = false,
+        entraClientID: String = ""
     ) {
         self.sessionManager  = sessionManager
         self.authProvider    = authProvider
@@ -72,6 +77,7 @@ public final class DashboardViewModel: ObservableObject {
         self.remoteWipe      = remoteWipe
         self.profileManager  = profileManager
         self.isDemoMode      = isDemoMode
+        self.entraClientID   = entraClientID
 
         bindSessionManager()
     }

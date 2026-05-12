@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.3.3]
+
+### Fixed
+- **Edge / Chrome "Keychain Not Found"** — profile keychain is no longer set as the system default keychain. `login.keychain-db` stays the default so Chromium-based browsers can write passwords without error. The profile keychain is still prepended to the search list so MSAL reads find profile tokens first.
+- **Subdomain work emails rejected as personal accounts** — `TenantDiscovery` now walks up the domain hierarchy (`user@mail.contoso.com` → tries `contoso.com` as fallback). Adds an OpenID Connect fallback for federated/hybrid tenants that don't surface correctly in Microsoft's UserRealm API. Fixes `user@main.intgin.net`-style addresses.
+
+---
+
 ## [v1.2.0]
 
 ### Added

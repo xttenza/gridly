@@ -59,3 +59,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **GridlyHelper** SMJobBless privileged helper for hdiutil operations.
 - **GridlyMobile** — iPhone + iPad companion app (SwiftUI, `NavigationSplitView`).
 - GitHub Actions CI (push) and release (tag) workflows.
+
+---
+
+## [v1.3.4]
+
+### Fixed
+- **Profiles lost on restart** — demo mode was writing the profile registry to a new random temp directory every launch. Now uses `~/Library/Application Support/Gridly/Demo/`, a stable path that survives app relaunches and updates.
+- **Session email cannot be changed** — the status bar now shows a pencil icon (demo mode only) next to the signed-in email. Click it to type your own address; press Return or ✓ to confirm. The value is persisted in UserDefaults so it survives restarts. In production (MSAL-authenticated) mode the field remains read-only as it reflects your real Entra ID account.
+- Demo profiles no longer start pre-filled with `jane.doe@contoso.com` — account identifier fields start blank so you fill in your own details.
+

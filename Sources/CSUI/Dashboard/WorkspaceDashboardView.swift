@@ -191,6 +191,10 @@ struct SidebarView: View {
 struct WorkspaceStatusBar: View {
     @ObservedObject var viewModel: DashboardViewModel
 
+    @State private var editingUPN = false
+    @State private var upnDraft   = ""
+    @FocusState private var upnFieldFocused: Bool
+
     var body: some View {
         HStack(spacing: 16) {
             HStack(spacing: 6) {
@@ -224,16 +228,80 @@ struct WorkspaceStatusBar: View {
 
             Spacer()
 
-            if let session = viewModel.session {
-                Text(session.userPrincipalName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            // Session identity — editable in demo mode, read-only in production.
+            sessionIdentityView
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
+    }
+
+    @ViewBuilder
+    private var sessionIdentityView: some View {
+        if editingUPN {
+            // Inline editor — shown only in demo mode when user taps the pencil
+            HStack(spacing: 4) {
+                TextField("your@work-email.com", text: $upnDraft)
+                    .font(.caption)
+                    .textFieldStyle(.plain)
+                    .focused($upnFieldFocused)
+                    .frame(minWidth: 160, maxWidth: 240)
+                    .onSubmit { saveUPN() }
+
+                Button(action: saveUPN) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    editingUPN = false
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            HStack(spacing: 4) {
+                let upn = viewModel.session?.userPrincipalName ?? ""
+                if upn.isEmpty {
+                    Text(viewModel.isDemoMode ? "Set your email…" : "Not signed in")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                } else {
+                    Text(upn)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Pencil affordance — only in demo mode
+                if viewModel.isDemoMode {
+                    Button {
+                        upnDraft = viewModel.session?.userPrincipalName ?? ""
+                        editingUPN = true
+                        // Slight delay so the field renders before we request focus
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            upnFieldFocused = true
+                        }
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func saveUPN() {
+        viewModel.updateSessionIdentity(upn: upnDraft)
+        editingUPN = false
     }
 }
 

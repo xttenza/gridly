@@ -42,6 +42,9 @@ public final class DashboardViewModel: ObservableObject {
     /// Multi-profile manager — nil in legacy/demo mode (single-workspace path).
     public private(set) var profileManager: ProfileManager?
 
+    /// `true` when running in demo mode — enables editable session identity in the UI.
+    public private(set) var isDemoMode: Bool = false
+
     private var cancellables = Set<AnyCancellable>()
     private var policyPollingTask: Task<Void, Never>?
 
@@ -56,7 +59,8 @@ public final class DashboardViewModel: ObservableObject {
         auditLogger: AuditLogger,
         tamperDetector: TamperDetector,
         remoteWipe: RemoteWipeHandler,
-        profileManager: ProfileManager? = nil
+        profileManager: ProfileManager? = nil,
+        isDemoMode: Bool = false
     ) {
         self.sessionManager  = sessionManager
         self.authProvider    = authProvider
@@ -67,8 +71,29 @@ public final class DashboardViewModel: ObservableObject {
         self.tamperDetector  = tamperDetector
         self.remoteWipe      = remoteWipe
         self.profileManager  = profileManager
+        self.isDemoMode      = isDemoMode
 
         bindSessionManager()
+    }
+
+    // MARK: - Demo Helpers
+
+    /// Updates the displayed session identity (demo mode only).
+    /// In production the UPN is authoritative from MSAL and should not be overwritten.
+    public func updateSessionIdentity(upn: String) {
+        guard isDemoMode else { return }
+        let trimmed = upn.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        UserDefaults.standard.set(trimmed, forKey: "demoSessionUPN")
+        let existing = session
+        sessionManager.session = WorkspaceSession(
+            userPrincipalName: trimmed,
+            displayName: trimmed,
+            tenantID: existing?.tenantID ?? "demo.local",
+            accessTokenExpiresAt: existing?.accessTokenExpiresAt ?? Date().addingTimeInterval(86400 * 365),
+            isAuthenticated: true,
+            complianceStatus: existing?.complianceStatus ?? .compliant
+        )
     }
 
     // MARK: - Session Binding
@@ -201,8 +226,12 @@ public final class DashboardViewModel: ObservableObject {
         let km = KeychainManager(service: "com.cs.demo")
         let td = TamperDetector(keychainManager: km)
 
-        let containerDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cs-demo-\(UUID().uuidString)")
+        // Use a stable path so demo profiles persist across launches.
+        // ~/Library/Application Support/Gridly/Demo/ is stable, survives app updates,
+        // and is separate from production data at …/Gridly/ (no Profiles/ sub-dir clash).
+        let containerDir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Gridly/Demo", isDirectory: true)
         // Must create directory before GRDB tries to open database files inside it
         try? FileManager.default.createDirectory(at: containerDir, withIntermediateDirectories: true)
         let volumeManager = WorkspaceVolumeManager(containerDirectory: containerDir)
@@ -219,12 +248,15 @@ public final class DashboardViewModel: ObservableObject {
         let auditDB = try! AuditDatabase(url: containerDir.appendingPathComponent("audit.db"))
         let auditLogger = AuditLogger(db: auditDB, signingKey: stubKey)
 
+        // Load a persisted demo session UPN from UserDefaults so the user's edits
+        // survive launches. Falls back to empty — status bar will show nothing.
+        let savedUPN = UserDefaults.standard.string(forKey: "demoSessionUPN") ?? ""
         let demoSession = WorkspaceSession(
-            userPrincipalName: "jane.doe@contoso.com",
-            displayName: "Jane Doe",
-            tenantID: "contoso.onmicrosoft.com",
-            accessTokenExpiresAt: Date().addingTimeInterval(3600),
-            isAuthenticated: true,
+            userPrincipalName: savedUPN,
+            displayName: savedUPN,
+            tenantID: "demo.local",
+            accessTokenExpiresAt: Date().addingTimeInterval(86400 * 365),
+            isAuthenticated: !savedUPN.isEmpty,
             complianceStatus: .compliant
         )
         let sessionManager = WorkspaceSessionManager(
@@ -274,29 +306,35 @@ public final class DashboardViewModel: ObservableObject {
             keychainManager: km
         )
 
-        // Pre-populate with representative demo profiles (no real APFS volumes)
-        let workProfileID = UUID()
-        let clientProfileID = UUID()
-        profileManager.injectDemoProfiles([
-            WorkspaceProfile(
-                id: workProfileID,
-                name: "Contoso Work",
-                accountIdentifier: "jane.doe@contoso.com",
-                color: .blue
-            ),
-            WorkspaceProfile(
-                id: clientProfileID,
-                name: "Client — Fabrikam",
-                accountIdentifier: "jane@fabrikam.com",
-                color: .purple
-            ),
-            WorkspaceProfile(
-                id: UUID(),
-                name: "Dev / Staging",
-                accountIdentifier: "",
-                color: .orange
-            ),
-        ], mountedIDs: [workProfileID])
+        // Wire session manager so mounting a demo profile can update the session card.
+        profileManager.sessionManager = sessionManager
+
+        // Only seed demo profiles on first launch — if the registry already has saved
+        // profiles (from a previous session), use those instead so edits persist.
+        if profileManager.profiles.isEmpty {
+            let workProfileID = UUID()
+            let clientProfileID = UUID()
+            profileManager.injectDemoProfiles([
+                WorkspaceProfile(
+                    id: workProfileID,
+                    name: "Contoso Work",
+                    accountIdentifier: "",
+                    color: .blue
+                ),
+                WorkspaceProfile(
+                    id: clientProfileID,
+                    name: "Client — Fabrikam",
+                    accountIdentifier: "",
+                    color: .purple
+                ),
+                WorkspaceProfile(
+                    id: UUID(),
+                    name: "Dev / Staging",
+                    accountIdentifier: "",
+                    color: .orange
+                ),
+            ], mountedIDs: [workProfileID])
+        }
 
         let vm = DashboardViewModel(
             sessionManager: sessionManager,
@@ -307,7 +345,8 @@ public final class DashboardViewModel: ObservableObject {
             auditLogger: auditLogger,
             tamperDetector: td,
             remoteWipe: remoteWipe,
-            profileManager: profileManager
+            profileManager: profileManager,
+            isDemoMode: true
         )
 
         // Pre-populate published state (session comes via Combine from sessionManager above)

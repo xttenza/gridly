@@ -111,12 +111,14 @@ public final class ProfileManager: ObservableObject {
 
     /// Injects pre-built profiles without creating real APFS volumes.
     /// Call this in demo mode to populate the UI with representative data.
+    /// Saves to the registry so subsequent launches restore the same profiles.
     public func injectDemoProfiles(_ demoProfiles: [WorkspaceProfile], mountedIDs: Set<UUID> = []) {
         profiles = demoProfiles
         for profile in demoProfiles {
             let isMounted = mountedIDs.contains(profile.id)
             mountStates[profile.id] = ProfileMountState(isMounted: isMounted)
         }
+        saveRegistry()
     }
 
     // MARK: - Profile CRUD
